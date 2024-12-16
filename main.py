@@ -23,7 +23,7 @@ def train():
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     scheduler = CosineWarmupScheduler(optimizer, warmup=100, max_iters=len(dataset)//batch_size *epochs)
-    wandb.init(project="celltype_classification")
+    wandb.init(project="celltype_classification", config=config)
     loss_avg = 0.0
     accuracy_avg = 0.0
     with tqdm(total=len(dataset)//batch_size *epochs) as pbar:
