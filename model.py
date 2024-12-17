@@ -26,7 +26,7 @@ class EncoderModelPreTrain(nn.Module):
     def __init__(self, num_classes, num_tokens, hidden_dim = dim_hidden,n_layers = n_layers):
         super().__init__()
         self.embedding = torch.nn.Embedding(num_tokens, hidden_dim)
-        self.module_list = nn.ModuleList([nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=4,dim_feedforward=4*hidden_dim, batch_first=True, activation='gelu') for i in range(n_layers)])
+        self.module_list = nn.ModuleList([nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=hidden_dim//64,dim_feedforward=4*hidden_dim, batch_first=True, activation='gelu') for i in range(n_layers)])
         self.classification_token = nn.Parameter(torch.Tensor(hidden_dim), requires_grad=True)
         nn.init.uniform_(self.classification_token, a=-1/math.sqrt(hidden_dim), b=1/math.sqrt(hidden_dim))
         self.dense = nn.Linear(hidden_dim, num_classes)
