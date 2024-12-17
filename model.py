@@ -33,6 +33,9 @@ class EncoderModelPreTrain(nn.Module):
 
         if use_pos_enc:
             self.positional_encoding = self.generate_positional_encoding(pad_length, dim_hidden).to(device)
+        if use_rank_enc:
+            self.rank = torch.arange(0, pad_length, dtype=torch.float).unsqueeze(1).to(device)
+            self.rank_encoding = nn.Sequential(nn.Linear(1, hidden_dim), nn.GELU(), nn.Linear(hidden_dim, hidden_dim))
 
     
     def generate_positional_encoding(self, pad_length, dim_hidden):
@@ -46,8 +49,11 @@ class EncoderModelPreTrain(nn.Module):
 
     def forward(self, x, mask):
         x = self.embedding(x)
+        if use_rank_enc:
+            x = x * self.rank_encoding(self.rank)
         if use_pos_enc:
             x = x + self.positional_encoding
+
         
         classification_token = torch.stack([self.classification_token.unsqueeze(0) for _ in range(x.shape[0])])
         x = torch.cat((classification_token,x),dim = 1)

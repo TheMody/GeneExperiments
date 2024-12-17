@@ -20,7 +20,10 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
     dataset = Dataset()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    split = int(0.9 * len(dataset))
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [split, len(dataset) - split])
+    dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     scheduler = CosineWarmupScheduler(optimizer, warmup=100, max_iters=len(dataset)//batch_size *epochs)
     wandb.init(project="celltype_classification", config=config)
@@ -63,6 +66,23 @@ def train():
                 accuracy_avg = 0.99 * accuracy_avg + 0.01 * accuracy
                 pbar.set_description(f"Loss: {loss_avg}, Accuracy: {accuracy_avg}")
                 pbar.update(1)
+
+            val_loss = 0.0
+            val_acc = 0.0
+            for i, (x, y) in enumerate(val_dataloader):
+                x, mask = x
+                mask = mask.to(device)
+                x = x.to(device)
+                y = y.to(device)
+                y_pred = model(x, mask)
+                accuracy = y_pred.argmax(dim=1).eq(y).sum().item() / len(y)
+                loss = criterion(y_pred, y)
+                val_loss += loss.item()
+                val_acc += accuracy
+            val_loss /= len(val_dataloader)
+            val_acc /= len(val_dataloader)
+            wandb.log({"val_loss": val_loss, "val_accuracy": val_acc})
+            print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_acc}")
 
 if __name__ == "__main__":
     train()
