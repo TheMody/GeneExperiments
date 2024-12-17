@@ -4,7 +4,7 @@
 
 import torch
 import numpy as np
-from model import MLPModel, TransformerModel
+from model import MLPModel,EncoderModelPreTrain
 from dataset_info import *
 from config import *
 from dataset import Dataset
@@ -14,7 +14,7 @@ import time
 from tqdm import tqdm
 def train():
 
-    model = TransformerModel(num_tokens=Num_ids, num_classes=len(cell_types))
+    model = EncoderModelPreTrain(num_classes=len(cell_types), num_tokens=Num_ids)
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -30,8 +30,12 @@ def train():
         for epoch in range(epochs):
             for i, (x, y) in enumerate(dataloader):
                 start = time.time()
+                x, mask = x
+                mask = mask.to(device)
                 x = x.to(device)
                 y = y.to(device)
+
+                #print(mask)
 
                 if torch.max(x).item() >= Num_ids:
                     print("Invalid cell type", x)
@@ -39,7 +43,7 @@ def train():
                     continue
 
                 optimizer.zero_grad()
-                y_pred = model(x)
+                y_pred = model(x, mask)
                 loss = criterion(y_pred, y)
                 loss.backward()
                 optimizer.step()

@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 from config import *
+import math
+import torch.nn as nn   
 class MLPModel(torch.nn.Module):
     def __init__(self):
         super(MLPModel, self).__init__()
@@ -18,22 +20,44 @@ class MLPModel(torch.nn.Module):
         x = self.fc3(x)
         x = self.softmax(x)
         return x
-    
-class TransformerModel(torch.nn.Module):
-    def __init__(self, num_tokens, num_classes):
-        super(TransformerModel, self).__init__()
-        self.embedding = torch.nn.Embedding(num_tokens, dim_hidden)
-        encoder_layer = torch.nn.TransformerEncoderLayer(d_model=dim_hidden, nhead=4)
-        self.transformer = torch.nn.TransformerEncoder(encoder_layer, num_layers=6, enable_nested_tensor= False, mask_check=False)
-        self.fc = torch.nn.Linear(dim_hidden, num_classes)
-        #positional encoding for transformers
-        if use_pos_enc:
-            self.positional_encoding = torch.nn.Parameter(torch.randn(1, pad_length, dim_hidden))
 
-    def forward(self, x):
+class EncoderModelPreTrain(nn.Module):
+    #input should be (batchsize, num_pcas, dim_pcas)
+    def __init__(self, num_classes, num_tokens, hidden_dim = dim_hidden,n_layers = n_layers):
+        super().__init__()
+        self.embedding = torch.nn.Embedding(num_tokens, hidden_dim)
+        self.module_list = nn.ModuleList([nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=4,dim_feedforward=4*hidden_dim, batch_first=True, activation='gelu') for i in range(n_layers)])
+        self.classification_token = nn.Parameter(torch.Tensor(hidden_dim), requires_grad=True)
+        nn.init.uniform_(self.classification_token, a=-1/math.sqrt(hidden_dim), b=1/math.sqrt(hidden_dim))
+        self.dense = nn.Linear(hidden_dim, num_classes)
+
+        if use_pos_enc:
+            self.positional_encoding = self.generate_positional_encoding(pad_length, dim_hidden).to(device)
+
+    
+    def generate_positional_encoding(self, pad_length, dim_hidden):
+        pe = torch.zeros(pad_length, dim_hidden)
+        position = torch.arange(0, pad_length, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, dim_hidden, 2).float() * (-math.log(10000.0) / dim_hidden))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        return pe
+
+    def forward(self, x, mask):
         x = self.embedding(x)
         if use_pos_enc:
             x = x + self.positional_encoding
-        x = self.transformer(x)
-        x = self.fc(torch.mean(x, dim=1))
-        return x
+        
+        classification_token = torch.stack([self.classification_token.unsqueeze(0) for _ in range(x.shape[0])])
+        x = torch.cat((classification_token,x),dim = 1)
+
+        #also add one token to the mask
+        mask = torch.cat((torch.zeros(mask.shape[0],1).bool().to(mask.device),mask),dim = 1)
+
+        for layer in self.module_list:
+            x = layer(x, src_key_padding_mask=mask)
+    
+        classification_token = x[:,0,:]
+        return self.dense(classification_token)
+    

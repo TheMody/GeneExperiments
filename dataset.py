@@ -20,11 +20,13 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x = self.dataset[idx]["input_ids"] 
      #   print(len(x))
+        mask = torch.zeros(pad_length)
         if len(x) < pad_length:
-            x = np.pad(x, (0, pad_length-len(x)), 'constant')
+            mask[len(x):] = 1
+            x = np.pad(x, (0, pad_length-len(x)), 'constant') 
         else:
             x = x[:pad_length]
-        x = torch.tensor(x)
+        x = torch.tensor(x), mask.to(torch.bool)
         y = self.dataset[idx]["cell_type"]
         y = torch.tensor(cell_types.index(y))
         return x,y
