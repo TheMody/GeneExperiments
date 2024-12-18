@@ -30,6 +30,7 @@ def train():
     loss_avg = 0.0
     accuracy_avg = 0.0
     with tqdm(total=len(dataset)//batch_size *epochs) as pbar:
+        model.train()
         for epoch in range(epochs):
             for i, (x, y) in enumerate(dataloader):
                 start = time.time()
@@ -69,16 +70,17 @@ def train():
 
             val_loss = 0.0
             val_acc = 0.0
+            model.eval()
             for i, (x, y) in enumerate(val_dataloader):
                 x, mask = x
                 mask = mask.to(device)
                 x = x.to(device)
                 y = y.to(device)
                 y_pred = model(x, mask)
-                accuracy = y_pred.argmax(dim=1).eq(y).sum().item() / len(y)
+                accuracy = y_pred.argmax(dim=1).eq(y).sum() / len(y)
                 loss = criterion(y_pred, y)
                 val_loss += loss.item()
-                val_acc += accuracy
+                val_acc += accuracy.item()
             val_loss /= len(val_dataloader)
             val_acc /= len(val_dataloader)
             wandb.log({"val_loss": val_loss, "val_accuracy": val_acc})
