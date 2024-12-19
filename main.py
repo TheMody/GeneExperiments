@@ -13,8 +13,10 @@ from cosine_scheduler import CosineWarmupScheduler
 import time
 from tqdm import tqdm
 def train():
-
-    model = EncoderModelPreTrain(num_classes=len(cell_types), num_tokens=Num_ids)
+    if model_type == "transformer":
+        model = EncoderModelPreTrain(num_classes=len(cell_types), num_tokens=Num_ids)
+    if model_type == "mlp":
+        model = MLPModel(num_classes=len(cell_types), num_ids=Num_ids)
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -25,11 +27,11 @@ def train():
     dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    scheduler = CosineWarmupScheduler(optimizer, warmup=100, max_iters=len(dataset)//batch_size *epochs)
+    scheduler = CosineWarmupScheduler(optimizer, warmup=100, max_iters=len(train_dataset)//batch_size *epochs)
     wandb.init(project="celltype_classification", config=config)
     loss_avg = 0.0
     accuracy_avg = 0.0
-    with tqdm(total=len(dataset)//batch_size *epochs) as pbar:
+    with tqdm(total=len(train_dataset)//batch_size *epochs) as pbar:
         model.train()
         for epoch in range(epochs):
             for i, (x, y) in enumerate(dataloader):

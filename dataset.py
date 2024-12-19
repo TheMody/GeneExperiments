@@ -11,7 +11,7 @@ class Dataset(torch.utils.data.Dataset):
     def __init__(self):
         dataset_path = 'celltype_dataset.dataset'
         self.dataset = load_from_disk(dataset_path)
-
+        
 
 
     def __len__(self):

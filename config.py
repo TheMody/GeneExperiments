@@ -8,6 +8,7 @@ dim_hidden = 256
 use_pos_enc = False
 use_rank_enc = False
 n_layers = 6
+model_type = "transformer"#, "mlp" "transformer"
 
 config = {  
     'device': device,
@@ -18,5 +19,6 @@ config = {
     'dim_hidden': dim_hidden,
     'use_pos_enc': use_pos_enc,
     'use_rank_enc': use_rank_enc,
-    'n_layers': n_layers
+    'n_layers': n_layers,
+    'model_type': model_type
 }

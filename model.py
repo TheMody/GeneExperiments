@@ -3,23 +3,7 @@ import torch.nn.functional as F
 from config import *
 import math
 import torch.nn as nn   
-class MLPModel(torch.nn.Module):
-    def __init__(self):
-        super(MLPModel, self).__init__()
-        self.fc1 = torch.nn.Linear(768, 256)
-        self.fc2 = torch.nn.Linear(256, 64)
-        self.fc3 = torch.nn.Linear(64, 10)
-        self.relu = torch.nn.ReLU()
-        self.softmax = torch.nn.Softmax(dim=1)
 
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
-        x = self.softmax(x)
-        return x
 
 class EncoderModelPreTrain(nn.Module):
     #input should be (batchsize, num_pcas, dim_pcas)
@@ -67,3 +51,27 @@ class EncoderModelPreTrain(nn.Module):
         classification_token = x[:,0,:]
         return self.dense(classification_token)
     
+
+
+class MLPModel(nn.Module):
+    def __init__(self, num_classes, num_ids, num_lin_blocks = 1, hidden_dim = dim_hidden):
+        super().__init__()
+        self.embedding = nn.Embedding(num_ids, hidden_dim)
+        self.linears = nn.ModuleList([nn.Linear(hidden_dim, hidden_dim) for _ in range(num_lin_blocks*2)])
+        self.out = nn.Linear(hidden_dim, num_classes)
+        if use_rank_enc:
+            self.rank = torch.arange(0, pad_length, dtype=torch.float).unsqueeze(1).to(device)
+            self.rank_encoding = nn.Sequential(nn.Linear(1, hidden_dim), nn.GELU(), nn.Linear(hidden_dim, 1))
+
+    def forward(self, x, mask):
+        
+        x = self.embedding(x)
+        if use_rank_enc:
+            x = x * self.rank_encoding(self.rank)
+        x = x * torch.logical_not(mask).unsqueeze(-1)
+        x = x.sum(dim = 1)/torch.logical_not(mask).sum(dim = 1).unsqueeze(-1)
+        for i in range(len(self.linears)//2):
+            x2 = x
+            x = F.gelu(self.linears[i*2](x))
+            x = F.gelu(self.linears[i*2+1](x)) +x2
+        return self.out(x)
